@@ -9,14 +9,84 @@
 </head>
 <body>
 	<div id="app"></div>
+	<div id="recycle"></div>
 </body>
 
 <script type="text/babel">
+	class RecycleBin extends React.Component {
+		constructor(props){
+			super(props);
+			this.state = {cur_index:-1, prev_index:-1};
+			this.cached = [];			
+		}
+		
+		render() {
+			if(this.state.cur_index>=0 && this.state.cur_index!=this.state.prev_index){
+				this.cached.push(this.props.taskList);
+			}
+			
+			return (
+				<div className = 'todo-app'>
+					<h1>Total tasks in RecycleBin{this.cached.length}</h1>
+					<div align ="center">
+						<table>						
+							<tbody>
+							{
+							this.cached.map((taskList, index) => 
+								<tr key={index}>
+									<td>{taskList}</td>
+									<td><button  onClick={()=> this.remove(index)}>Remove</button></td>
+									<td><button onClick={()=> this.restore(index)}> Restore</button> </td>
+								</tr> 
+								)
+							}
+							</tbody>
+						</table>
+					</div>
+				</div>
+			);
+		}
+		
+		
+		remove = (index) => {
+			// this.cached.splice(index,1);
+			this.cached.splice(index,1);
+			console.log("after splice : ");
+			console.log(this.cached);
+			this.setState({cur_index:-1});
+			//write your code to add stu to Student Component using props
+		}
+		
+		restore = (index) => {
+			var n=[...this.state.restore]
+			this.state.tasks=[...this.state.tasks,n.splice(i,1)]
+			this.setState(state=>({restore:n,}));
+            console.log(this.state.tasks)
+
+		 }
+		
+		getSnapshotBeforeUpdate(prevProps, prevState) {
+			if(prevProps.index!=this.props.index){
+				this.setState({cur_index:this.props.index});
+			}
+			return null;
+		}
+		
+		componentDidUpdate(){
+			
+		}
+		
+		componentDidMount(){
+			console.log("Mount", this.props.index)
+			this.setState({cur_index:this.props.index});
+		}
+	}
 
 	class User extends React.Component{
 		constructor(props){
 			super(props);
-			this.state = {taskList: [], input:"", index:-1};
+			this.state = {taskList: [], timeList: [], input:"", time:"", index:-1};
+			this.cached = [];
 		}
 		
 		render(){ 
@@ -25,19 +95,23 @@
 					<h1>To-Do List</h1>
 					<div align ="center">
 					<input type='text' onChange={this.setInp} name='taskitem'  id="taskitem" value={this.state.input} placeholder='Add a Task' />
+					<input type='text' onChange={this.setTime} name='tasktime'  id="tasktime" value={this.state.time} placeholder='End Time: HH:MM:SS' />
 					<button className='greenShow' onClick={this.addtoList}>+</button><button className='greenShow' onClick={this.update}>Update</button>
 					<div><h2>Tasks Left {this.state.taskList.length}</h2></div>
 					<table>
 						<tbody>
 
+
 						{
 							this.state.taskList.map((usr, i) => 
 							<tr key={i}>
+								
 								<td>{usr}</td>
 								<td><button className ="redShow" onClick={this.remove} value={i}>Delete</button></td>
 								<td><button className ="greenShow" onClick={()=> this.edit(i)} value={i}>Edit</button></td>
 							</tr>
 							)
+		
 						}
 						</tbody>						
 					</table>
@@ -48,30 +122,42 @@
 
 		setInp = (event) => {
 			console.log(event.target.value)
-			this.setState({input:event.target.value});
+			this.setState({input: event.target.value});
+		}
+		setTime = (event) => {
+			console.log(event.target.value)
+			this.setState({time: event.target.value});
 		}
 
 		
 		addtoList = () =>{
-			const taskitem = document.querySelector("#taskitem").value;
-			console.log(taskitem);
-			if (taskitem === ""){
+			const taskitem = this.state.input
+			const timeitem = this.state.time
+			console.log(taskitem, timeitem);
+			if (taskitem === "" || timeitem === ""){
 				alert("plase Add a Task")
 			}
 			else
 			{
 			this.setState({taskList:[...this.state.taskList,taskitem]});
-			console.log(this.state.taskList);
-			this.setState({input:""});
+			this.setState({timeList:[...this.state.timeList,timeitem]});
+			console.log(this.state.taskList, this.state.timeList);
+			this.setState({input:"", time:""});
 			}
 		}
 
 		remove = (e) => {
 			// alert(e.target.value)
 			const v = e.target.value
-			this.state.taskList.splice(v,1)
-			this.setState({users:[...this.state.taskList]});
+			const task = this.state.taskList[v];			
+			const tasks = this.state.taskList; 
+			tasks.splice(v,1);
+			this.setState({taskList:tasks});
+
+			this.state.timeList.splice(v, 1);
+			this.setState({timeList:[...this.state.timeList]});
 			// console.log(this.state.taskList);
+			ReactDOM.render(<RecycleBin index={v} taskList={task}/>, document.getElementById("recycle"));
 
 		}
 		 edit = (i) =>{
@@ -87,18 +173,45 @@
 					taskList[i] = this.state.input
 				}
                 this.setState({taskList: taskList});
-            	this.setState({input:""});
+            	this.setState({input:"", index:-1});
         }
 
-		componentDidMount(){
-			const taskList = localStorage.getItem("taskList");
-			if(taskList!=null){
-				this.setState({taskList:JSON.parse(taskList)});
-			}
-			
-			window.addEventListener("beforeunload", ()=>{
-				localStorage.setItem("students",JSON.stringify(this.state.taskList));
+
+	
+		getTaskList = () => {
+			fetch('https://raw.githubusercontent.com/Phaneendrabejawada/to-do-list/main/taskList.json') 
+			.then(resp => resp.json())
+			.then(data => {
+				console.log(data);
+				this.setState({taskList:data});
 			});
+		}
+		
+		componentDidMount() 
+		{
+			this.getTaskList() 
+			this.myvar = setInterval(() => {
+				let i = 0;
+				while ( i < this.state.taskList.length) {
+					var t = new Date()
+					var time = t.getHours() + ":" + t.getMinutes() + ":" + t.getSeconds();
+					if (time > this.state.timeList[i] ){
+						alert("Task " +(i+1) + " will be deleted")
+						// this.remove()
+						const task = this.state.taskList.splice(i,1)
+						this.state.timeList.splice(i,1)
+						this.setState({taskList:[...this.state.taskList]})						
+						this.setState({timeList:[...this.state.timeList]})
+						ReactDOM.render(<RecycleBin index={i} taskList={task}/>, document.getElementById("recycle"));
+					}  
+					i++                     
+				}
+			}, 1000);
+
+    	}
+		componentWillUnmount() 
+		{
+			clearInterval(this.myvar);
 		}
 	}
 
@@ -112,7 +225,10 @@
 		}
 	}
 
-	ReactDOM.render(<App/>, document.querySelector('#app'));		
+	ReactDOM.render(<App/>, document.querySelector('#app'));
+	
+
+
 </script>
 
 </html>
